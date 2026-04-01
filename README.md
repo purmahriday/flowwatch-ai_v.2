@@ -21,6 +21,11 @@ FlowWatch AI monitors network health across multiple hosts in real time. It trac
 
 It runs two ML models on this data simultaneously, combines their outputs into a single anomaly score, and when something looks wrong it uses Claude (Anthropic's LLM) to explain the root cause in plain English.
 
+## Architecture
+
+I designed this architecture by mapping out the data flow on paper first. The core idea was to keep each layer independent — the pipeline doesn't care about the models, the models don't care about the API, the API doesn't care about the frontend.
+
+```
 [Network Hosts — simulated for now, real agents in production]
   host-01  host-02  host-03  host-04  host-05
       |        |        |        |        |
@@ -83,6 +88,10 @@ It runs two ML models on this data simultaneously, combines their outputs into a
   │   Next.js Dashboard          │  ← not built yet
   │   localhost:3000             │    real-time charts + anomaly feed
   └──────────────────────────────┘
+```
+
+---
+
 
 ### The ML Decision — Why These Two Models
 This took me a while to figure out. My previous project used transformer-based architectures, and my first instinct here was to use an Autoencoder for anomaly detection since I'd worked with them before. But autoencoders for network anomaly detection have a real problem — they're good at reconstructing everything, including anomalies, once they've seen enough data. The reconstruction error stops being a reliable signal.

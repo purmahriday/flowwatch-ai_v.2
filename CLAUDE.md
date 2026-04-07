@@ -53,7 +53,9 @@ flowwatch-ai/
 │   │   │   ├── telemetry.py    # Ingest & query telemetry endpoints
 │   │   │   ├── anomalies.py    # Anomaly detection endpoints
 │   │   │   └── assistant.py    # LLM-based RCA assistant endpoints
-│   │   └── main.py             # FastAPI app entrypoint
+│   │   ├── main.py             # FastAPI app entrypoint + lifespan
+│   │   ├── dependencies.py     # verify_api_key, get_anomaly_detector, get_feature_extractor
+│   │   └── schemas.py          # All Pydantic request/response schemas
 │   ├── models/
 │   │   ├── lstm_model.py       # PyTorch LSTM anomaly detection model
 │   │   ├── isolation_forest.py # Scikit-learn Isolation Forest model
@@ -258,7 +260,7 @@ Track progress here as features are completed.
 - [X] Phase 3: Feature engineering pipeline
 - [X] Phase 4: Isolation Forest model (faster to build first)
 - [~] Phase 5: LSTM model (PyTorch) + training notebook
-- [ ] Phase 6: FastAPI inference endpoints
+- [~] Phase 6: FastAPI inference endpoints
 - [ ] Phase 7: LLM RCA assistant (Claude API integration)
 - [ ] Phase 8: Alert manager + CloudWatch integration
 - [ ] Phase 9: Next.js frontend dashboard
@@ -276,6 +278,9 @@ Track progress here as features are completed.
 | 2026-04-01 | Claude API for RCA assistant                  | Best-in-class for log/telemetry analysis    |
 | 2026-04-01 | LocalStack for local Kinesis simulation       | Avoid AWS costs during development          |
 | 2026-04-01 | Next.js + Recharts for frontend               | SSR + real-time chart support               |
+| 2026-04-05 | In-memory stores (deque) for Phase 6          | No DB wired yet; replace with TimescaleDB in Phase 10 |
+| 2026-04-05 | API key auth via X-API-Key header             | Simple stateless auth; upgrade to JWT in Phase 11 |
+| 2026-04-05 | Rule-based fallback when Claude API fails     | Ensures assistant endpoint is always available |
 
 ---
 
@@ -457,6 +462,70 @@ Saved by `LSTMTrainer._save_artifact()`.  Single `torch.save` dict containing:
 | LOSS         | packet_loss_pct       | 15 – 40 %               |
 | DNS          | dns_failure_rate      | 0.4 – 0.9               |
 | CASCADE      | all four metrics      | All ranges above + jitter 50–150 ms |
+
+---
+
+## Phase 6 API Schemas (backend/api/schemas.py)
+
+### TelemetryIngestRequest
+
+| Field              | Type              | Constraints         | Description                                   |
+|--------------------|-------------------|---------------------|-----------------------------------------------|
+| `host_id`          | `str`             | pattern `host-\d{2}`| Host identifier, e.g. `host-01`               |
+| `latency_ms`       | `float`           | [0, 1000]           | Round-trip latency in ms                      |
+| `packet_loss_pct`  | `float`           | [0, 100]            | Packet loss as a percentage                   |
+| `dns_failure_rate` | `float`           | [0, 1]              | DNS failure fraction                          |
+| `jitter_ms`        | `float`           | [0, 500]            | Network jitter in ms                          |
+| `timestamp`        | `datetime \| None`| optional            | Record time; defaults to UTC now              |
+
+### TelemetryIngestResponse
+
+| Field             | Type                              | Description                                            |
+|-------------------|-----------------------------------|--------------------------------------------------------|
+| `record_id`       | `str`                             | UUID4 assigned to this record                          |
+| `host_id`         | `str`                             | Echo of the ingested host                              |
+| `processed`       | `bool`                            | True when preprocessing succeeded                      |
+| `anomaly_detected`| `bool`                            | False when window not yet full                         |
+| `anomaly_result`  | `CombinedAnomalyResultSchema\|None`| Populated when anomaly detected                       |
+| `window_ready`    | `bool`                            | True once 30 records buffered for this host            |
+| `message`         | `str`                             | Human-readable status                                  |
+
+### AnomalyDetectRequest / AnomalyDetectResponse
+
+`AnomalyDetectRequest`: `host_id: str` + `feature_vector: dict` (from `FeatureVector.to_dict()`).
+
+`AnomalyDetectResponse`: `host_id`, `detection_timestamp`, `recommendation` (str), `result` (CombinedAnomalyResultSchema).
+
+### AnomalyRecord (stored in app.state.anomaly_store)
+
+| Field                       | Type                  | Description                               |
+|-----------------------------|-----------------------|-------------------------------------------|
+| `record_id`                 | `str`                 | UUID4                                     |
+| `host_id`                   | `str`                 |                                           |
+| `detected_at`               | `datetime`            | UTC wall-clock time of detection          |
+| `severity`                  | `str`                 | critical / high / medium / low            |
+| `combined_score`            | `float`               | LSTM×0.6 + IF×0.4                         |
+| `is_anomaly`                | `bool`                |                                           |
+| `detection_method`          | `str`                 | lstm+if / lstm_only / if_only / none      |
+| `worst_feature`             | `str`                 | Highest LSTM reconstruction error feature |
+| `top_contributing_features` | `list[str]`           | Top-3 IF deviation features               |
+| `lstm_result`               | `LSTMResultSchema`    | Full LSTM result                          |
+| `if_result`                 | `IFResultSchema`      | Full IF result                            |
+| `anomaly_timestamp`         | `datetime`            | Timestamp of the triggering record        |
+| `recommendation`            | `str`                 | Rule-based action recommendation          |
+
+### AssistantAnalyzeRequest / AssistantAnalyzeResponse
+
+`AssistantAnalyzeRequest`: `host_id`, `anomaly_result: dict`, `recent_telemetry: list[dict]`, `question: str`.
+
+`AssistantAnalyzeResponse`: `host_id`, `analysis: str`, `anomaly_severity`, `recommended_actions: list[str]`, `confidence: float`, `analysis_timestamp`, `model_used: str`.
+
+### In-Memory Store Limits (Phase 6)
+
+| Store             | Key      | Value type       | Max per host | Location           |
+|-------------------|----------|------------------|--------------|--------------------|
+| `telemetry_store` | host_id  | deque[ProcessedRecord] | 1 000  | `app.state`        |
+| `anomaly_store`   | host_id  | deque[AnomalyRecord]   | 500    | `app.state`        |
 
 ---
 

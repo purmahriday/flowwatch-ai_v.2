@@ -261,7 +261,7 @@ Track progress here as features are completed.
 - [X] Phase 4: Isolation Forest model (faster to build first)
 - [~] Phase 5: LSTM model (PyTorch) + training notebook
 - [~] Phase 6: FastAPI inference endpoints
-- [ ] Phase 7: LLM RCA assistant (Claude API integration)
+- [~] Phase 7: LLM RCA assistant (Claude API integration)
 - [ ] Phase 8: Alert manager + CloudWatch integration
 - [ ] Phase 9: Next.js frontend dashboard
 - [ ] Phase 10: Docker Compose full-stack wiring
@@ -281,6 +281,9 @@ Track progress here as features are completed.
 | 2026-04-05 | In-memory stores (deque) for Phase 6          | No DB wired yet; replace with TimescaleDB in Phase 10 |
 | 2026-04-05 | API key auth via X-API-Key header             | Simple stateless auth; upgrade to JWT in Phase 11 |
 | 2026-04-05 | Rule-based fallback when Claude API fails     | Ensures assistant endpoint is always available |
+| 2026-04-07 | RCAAgent in backend/assistant/rca_agent.py    | Separates LLM logic from route handlers; enables batch_analyze and reuse |
+| 2026-04-07 | AsyncAnthropic client in RCAAgent             | Matches FastAPI async model; avoids blocking event loop |
+| 2026-04-07 | Routes pull telemetry from app.state first    | Richer context without requiring caller to pass full history every time |
 
 ---
 
@@ -519,6 +522,46 @@ Saved by `LSTMTrainer._save_artifact()`.  Single `torch.save` dict containing:
 `AssistantAnalyzeRequest`: `host_id`, `anomaly_result: dict`, `recent_telemetry: list[dict]`, `question: str`.
 
 `AssistantAnalyzeResponse`: `host_id`, `analysis: str`, `anomaly_severity`, `recommended_actions: list[str]`, `confidence: float`, `analysis_timestamp`, `model_used: str`.
+
+---
+
+## Phase 7 Agent Schemas (backend/assistant/rca_agent.py)
+
+### RCAResponse (dataclass)
+
+Output of `RCAAgent.analyze()`.  Parsed from Claude's 4-section structured response.
+
+| Field                    | Type          | Description                                                               |
+|--------------------------|---------------|---------------------------------------------------------------------------|
+| `host_id`                | `str`         | Target host identifier                                                    |
+| `analysis`               | `str`         | Full Claude response text (or rule-based fallback summary)                |
+| `severity`               | `str`         | critical / high / medium / low — forwarded from anomaly_result            |
+| `what_is_happening`      | `str`         | Parsed section 1 — 1-2 sentence situation summary                         |
+| `root_cause`             | `str`         | Parsed section 2 — 2-3 sentence root cause assessment                     |
+| `immediate_actions`      | `list[str]`   | Parsed section 3 — 2-3 bullet-point action items                          |
+| `severity_justification` | `str`         | Parsed section 4 — one-line severity rationale                             |
+| `confidence`             | `float`       | `min(combined_score, 1.0)` — confidence derived from ensemble score        |
+| `model_used`             | `str`         | Claude model ID or `"rule-based-fallback"` when API unavailable            |
+| `analysis_timestamp`     | `datetime`    | UTC datetime when analysis was produced                                   |
+| `tokens_used`            | `int`         | Total input + output tokens consumed (0 for fallback)                     |
+| `latency_ms`             | `float`       | Wall-clock ms for the Claude API call (0.0 for fallback)                  |
+
+### ChatResponse (dataclass)
+
+Output of `RCAAgent.chat()`.
+
+| Field                    | Type          | Description                                                               |
+|--------------------------|---------------|---------------------------------------------------------------------------|
+| `response`               | `str`         | Claude's reply text                                                       |
+| `conversation_history`   | `list[dict]`  | Updated history `[{"role": str, "content": str}]` including the new turn  |
+
+### RCAAgent methods
+
+| Method            | Signature                                                                     | Description                                            |
+|-------------------|-------------------------------------------------------------------------------|--------------------------------------------------------|
+| `analyze()`       | `async (host_id, anomaly_result, recent_telemetry, question) → RCAResponse`   | Single anomaly RCA; falls back to rule-based on failure|
+| `chat()`          | `async (message, conversation_history, host_context) → ChatResponse`          | Multi-turn conversation; trims to last 10 turns        |
+| `batch_analyze()` | `async (anomalies: list[dict]) → list[RCAResponse]`                           | Up to 5 concurrent analyses via asyncio.gather         |
 
 ### In-Memory Store Limits (Phase 6)
 

@@ -218,6 +218,9 @@ LOG_LEVEL=INFO
 | GET    | /anomalies/latest         | Get latest detected anomalies            |
 | POST   | /anomalies/detect         | Run on-demand anomaly detection          |
 | POST   | /assistant/analyze        | Ask LLM assistant to explain anomaly     |
+| POST   | /assistant/chat           | Conversational follow-up with assistant  |
+| GET    | /alerts/recent            | Fetch recent fired alerts (filterable)   |
+| GET    | /alerts/stats             | Aggregate alert statistics               |
 | GET    | /health                   | Health check                             |
 
 ---
@@ -262,8 +265,8 @@ Track progress here as features are completed.
 - [~] Phase 5: LSTM model (PyTorch) + training notebook
 - [~] Phase 6: FastAPI inference endpoints
 - [~] Phase 7: LLM RCA assistant (Claude API integration)
-- [ ] Phase 8: Alert manager + CloudWatch integration
-- [ ] Phase 9: Next.js frontend dashboard
+- [~] Phase 8: Alert manager + CloudWatch integration
+- [~] Phase 9: Next.js frontend dashboard (AlertFeed + AlertDetailModal; alert-first UX)
 - [ ] Phase 10: Docker Compose full-stack wiring
 - [ ] Phase 11: AWS deployment (EC2 + Kinesis + CloudWatch)
 
@@ -284,6 +287,25 @@ Track progress here as features are completed.
 | 2026-04-07 | RCAAgent in backend/assistant/rca_agent.py    | Separates LLM logic from route handlers; enables batch_analyze and reuse |
 | 2026-04-07 | AsyncAnthropic client in RCAAgent             | Matches FastAPI async model; avoids blocking event loop |
 | 2026-04-07 | Routes pull telemetry from app.state first    | Richer context without requiring caller to pass full history every time |
+| 2026-04-07 | AlertManager is sync; callers use asyncio.to_thread | boto3 is blocking; keeps alert_manager.py simple, compatible with async FastAPI |
+| 2026-04-07 | alerts_router mounted at /alerts (not /anomalies/alerts) | Cleaner URL hierarchy; alerts are a separate concern from anomaly detection |
+| 2026-04-07 | CloudWatch dispatch disabled gracefully if boto3/creds missing | Keeps dev environment functional without AWS setup |
+| 2026-04-07 | Each dashboard component polls independently every 5 s          | Isolates fetch failures; a broken component doesn't stall others |
+| 2026-04-07 | Error boundaries wrap every dashboard panel                    | Render failures in one widget don't crash the whole page |
+| 2026-04-07 | RCAPanel state lifted to page.tsx (selectedAnomaly)            | AnomalyFeed and RCAPanel communicate via page state, not context |
+| 2026-04-07 | alerts_router mounted at /alerts; accessed via fetch in api.ts | Dashboard can add alert endpoints without touching anomaly route |
+| 2026-04-07 | AlertFeed replaces AnomalyFeed as primary view                 | Alerts are the operator-facing surface; anomalies are detail data |
+| 2026-04-07 | AlertDetailModal fetches /anomalies/latest?host_id=X on open   | Lazy-loads anomaly rows only when operator drills into an alert   |
+| 2026-04-07 | "Analyze with AI" closes modal and sets selectedAnomaly        | Reuses existing RCAPanel without a second chat surface            |
+| 2026-04-07 | Acknowledge is optimistic-UI: local state updates immediately  | Avoids a full re-poll just to reflect the ACK badge              |
+| 2026-04-07 | Active Alerts stat card now reads from /alerts/stats           | Decouples alert count from anomaly store; most_affected_host too  |
+| 2026-04-07 | AlertFeed cards show 4 metric rows with BAD/normal indicators  | Operators see the specific degraded metric without opening modal  |
+| 2026-04-07 | Peak telemetry fetched per host at AlertFeed level, not per-card | Deduplicates API calls; one fetch per unique host per poll cycle |
+| 2026-04-07 | Anomaly type label derived from thresholds (latency/loss/dns/jitter) | Gives instant human-readable context before AI analysis       |
+| 2026-04-07 | RCAPanel parses Claude's 4 sections client-side from analysis text | API returns full text; frontend splits into styled section boxes |
+| 2026-04-07 | RCA section boxes have colored left borders (blue/purple/red/orange) | Visual hierarchy matches NOC operator mental model             |
+| 2026-04-07 | rca_agent.py system prompt updated with metric-specific rules   | Prevents Claude from citing irrelevant metrics (e.g. DNS for latency-only anomaly) |
+| 2026-04-07 | _DEFAULT_MAX_TOKENS bumped 500→800 in rca_agent.py             | New specific prompt requires more completion space              |
 
 ---
 
@@ -569,6 +591,69 @@ Output of `RCAAgent.chat()`.
 |-------------------|----------|------------------|--------------|--------------------|
 | `telemetry_store` | host_id  | deque[ProcessedRecord] | 1 000  | `app.state`        |
 | `anomaly_store`   | host_id  | deque[AnomalyRecord]   | 500    | `app.state`        |
+
+---
+
+## Phase 8 Alert Schemas (backend/alerting/alert_manager.py)
+
+### Alert (dataclass)
+
+Created by `AlertManager.evaluate()` when an anomaly meets the severity threshold and is not in cooldown.
+
+| Field                       | Type                  | Description                                                              |
+|-----------------------------|-----------------------|--------------------------------------------------------------------------|
+| `alert_id`                  | `str`                 | UUID4 identifier                                                         |
+| `host_id`                   | `str`                 | Host that triggered the alert                                            |
+| `severity`                  | `str`                 | critical / high / medium / low                                           |
+| `combined_score`            | `float`               | Ensemble anomaly score [0, 1]                                            |
+| `worst_feature`             | `str`                 | Most degraded network metric (from LSTM)                                 |
+| `top_contributing_features` | `list[str]`           | Top-3 IF deviation features                                              |
+| `message`                   | `str`                 | Human-readable alert summary                                             |
+| `timestamp`                 | `datetime`            | UTC datetime when the alert was created                                  |
+| `acknowledged`              | `bool`                | True after operator acknowledges via `AlertManager.acknowledge()`        |
+| `resolved`                  | `bool`                | True after `AlertManager.resolve()` is called                            |
+| `resolution_timestamp`      | `datetime \| None`    | UTC datetime of resolution; None until resolved                          |
+
+### AlertRule (dataclass)
+
+| Field              | Type    | Description                                              |
+|--------------------|---------|----------------------------------------------------------|
+| `name`             | `str`   | Human-readable rule name                                 |
+| `min_severity`     | `str`   | Minimum severity to fire; lower severities are suppressed|
+| `cooldown_seconds` | `int`   | Seconds between consecutive alerts for the same host     |
+| `enabled`          | `bool`  | When False, rule is skipped                              |
+
+### AlertManagerStats (dataclass)
+
+Output of `AlertManager.get_stats()`.
+
+| Field                    | Type                  | Description                                              |
+|--------------------------|-----------------------|----------------------------------------------------------|
+| `total_alerts_fired`     | `int`                 | Total alerts that fired (not suppressed)                 |
+| `alerts_suppressed`      | `int`                 | Total alerts suppressed by cooldown or severity filter   |
+| `alerts_by_severity`     | `dict[str, int]`      | Count per severity level                                 |
+| `alerts_by_host`         | `dict[str, int]`      | Count per host                                           |
+| `most_affected_host`     | `str`                 | Host with most fired alerts; "none" if empty             |
+| `last_alert_timestamp`   | `datetime \| None`    | Timestamp of the most recently fired alert               |
+
+### AlertManager behaviour
+
+| Condition                                | Outcome                                     |
+|------------------------------------------|---------------------------------------------|
+| `is_anomaly=False`                       | Returns `None`; no count incremented        |
+| Severity below `min_severity`            | Suppressed; `alerts_suppressed` +1          |
+| Host in cooldown (`< cooldown_seconds`)  | Suppressed; `alerts_suppressed` +1          |
+| All conditions met                       | Alert fires, stored, dispatched, returned   |
+
+CloudWatch dispatch (when `AWS_ACCESS_KEY_ID` + `AWS_SECRET_ACCESS_KEY` present):
+- Metric: namespace `FlowWatchAI`, name `AnomalyScore`, dimensions `Host` + `Severity`
+- Logs: group `/flowwatch/alerts`, stream per `host_id`
+
+### In-Memory Alert Store (`app.state.alert_manager`)
+
+| Store           | Type             | Max total | Location      |
+|-----------------|------------------|-----------|---------------|
+| `_alerts`       | `deque[Alert]`   | 1 000     | `AlertManager`|
 
 ---
 

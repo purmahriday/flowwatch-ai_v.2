@@ -32,6 +32,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from loguru import logger
 
+from backend.alerting.alert_manager import AlertManager
 from backend.api.dependencies import verify_api_key
 from backend.models.feature_engineering import FeatureExtractor
 from backend.models.isolation_forest import DEFAULT_MODEL_PATH as IF_MODEL_PATH
@@ -74,6 +75,9 @@ async def lifespan(app: FastAPI):
     # ── Feature extractor ─────────────────────────────────────────────────────
     app.state.feature_extractor = FeatureExtractor()
     logger.info("FeatureExtractor initialised")
+
+    # ── Alert manager ─────────────────────────────────────────────────────────
+    app.state.alert_manager = AlertManager()  # auto-detects CloudWatch from env
 
     # ── ML models ─────────────────────────────────────────────────────────────
     app.state.anomaly_detector: Any = None
@@ -237,6 +241,12 @@ app.include_router(
     _anomaly_routes.router,
     prefix="/anomalies",
     tags=["Anomalies"],
+    dependencies=_auth_dep,
+)
+app.include_router(
+    _anomaly_routes.alerts_router,
+    prefix="/alerts",
+    tags=["Alerts"],
     dependencies=_auth_dep,
 )
 app.include_router(

@@ -233,6 +233,7 @@ async def ingest_telemetry(
     # ── Anomaly detection ─────────────────────────────────────────────────────
     anomaly_detected = False
     anomaly_schema: Optional[CombinedAnomalyResultSchema] = None
+    alert_id: Optional[str] = None
 
     if feature_vector is not None and anomaly_detector is not None:
         combined: CombinedAnomalyResult = await asyncio.to_thread(
@@ -250,6 +251,22 @@ async def ingest_telemetry(
                 method=combined.detection_method,
             )
             _store_anomaly(request, combined, body.host_id)
+
+            # ── Alert evaluation ──────────────────────────────────────────────
+            alert_manager = getattr(request.app.state, "alert_manager", None)
+            if alert_manager is not None:
+                alert = await asyncio.to_thread(
+                    alert_manager.evaluate, body.host_id, combined
+                )
+                if alert is not None:
+                    alert_id = alert.alert_id
+                    logger.info(
+                        "Alert fired via ingest | host={host} alert_id={aid} "
+                        "severity={sev}",
+                        host=body.host_id,
+                        aid=alert_id,
+                        sev=combined.severity,
+                    )
 
         anomaly_schema = _combined_to_schema(combined)
 
@@ -274,6 +291,7 @@ async def ingest_telemetry(
         anomaly_result=anomaly_schema if anomaly_detected else None,
         window_ready=window_ready,
         message=message,
+        alert_id=alert_id,
     )
 
 

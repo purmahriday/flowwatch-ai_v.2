@@ -1,3 +1,61 @@
-/* Global stylesheet.
-   Imports Tailwind base, components, and utilities layers.
-   Defines CSS custom properties for the design system (colours, spacing, fonts). */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --color-bg-primary: #111827;
+  --color-bg-secondary: #1f2937;
+  --color-bg-card: #1f2937;
+  --color-border: #374151;
+  --color-text-primary: #f9fafb;
+  --color-text-muted: #9ca3af;
+  --color-critical: #ef4444;
+  --color-high: #f97316;
+  --color-medium: #eab308;
+  --color-low: #3b82f6;
+  --color-healthy: #22c55e;
+}
+
+html,
+body {
+  background-color: var(--color-bg-primary);
+  color: var(--color-text-primary);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+}
+
+/* Scrollbar styling */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #1f2937;
+}
+::-webkit-scrollbar-thumb {
+  background: #4b5563;
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #6b7280;
+}
+
+/* Recharts overrides for dark theme */
+.recharts-cartesian-axis-tick-value {
+  fill: #9ca3af;
+  font-size: 11px;
+}
+.recharts-legend-item-text {
+  color: #d1d5db !important;
+  font-size: 12px;
+}
+.recharts-tooltip-wrapper .recharts-default-tooltip {
+  background-color: #1f2937 !important;
+  border: 1px solid #374151 !important;
+  border-radius: 6px !important;
+}
+.recharts-tooltip-label {
+  color: #f9fafb !important;
+}
+.recharts-tooltip-item {
+  color: #d1d5db !important;
+}

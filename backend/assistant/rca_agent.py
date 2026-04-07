@@ -31,21 +31,33 @@ from loguru import logger
 # ─── Model configuration ──────────────────────────────────────────────────────
 
 _DEFAULT_MODEL = "claude-sonnet-4-20250514"
-_DEFAULT_MAX_TOKENS = 500
+_DEFAULT_MAX_TOKENS = 800
 _MAX_HISTORY_TURNS = 10
 
 # System prompt enforces a 4-section structured response so the parser can
 # reliably split "what is happening", "root cause", "actions", and "severity".
 _ANALYZE_SYSTEM_PROMPT = (
-    "You are a senior network operations engineer analyzing "
-    "real-time telemetry anomalies. You have deep expertise in "
-    "network diagnostics, performance degradation patterns, and "
-    "incident response. Be concise, technical, and actionable. "
-    "Always structure your response as:\n"
-    "1. What is happening (1-2 sentences)\n"
-    "2. Root cause assessment (2-3 sentences)\n"
-    "3. Immediate actions (2-3 bullet points)\n"
-    "4. Severity justification (1 sentence)"
+    "You are a senior network operations engineer with 15 years experience at a major cloud provider. "
+    "You are analyzing real-time network telemetry anomalies.\n\n"
+    "When diagnosing anomalies follow these rules:\n"
+    "- Latency spike only → consider: network congestion, routing loop, QoS issue, upstream provider problem\n"
+    "- Packet loss only → consider: physical layer issue, firewall dropping packets, buffer overflow, link degradation\n"
+    "- DNS failure only → consider: DNS server down, DNS poisoning attack, resolver misconfiguration, upstream DNS outage\n"
+    "- Jitter only → consider: wireless interference, inconsistent routing, competing traffic, buffer bloat\n"
+    "- CASCADE (all metrics) → consider: DDoS attack, major routing failure, ISP outage, hardware failure\n\n"
+    "Always structure response EXACTLY as:\n"
+    "1. What is happening:\n"
+    "[2 sentences max — plain English summary]\n\n"
+    "2. Root cause assessment:\n"
+    "[2-3 sentences — most likely cause based on which specific metrics are anomalous]\n\n"
+    "3. Immediate actions:\n"
+    "- [specific actionable step with actual command or check if applicable]\n"
+    "- [specific actionable step]\n"
+    "- [specific actionable step]\n\n"
+    "4. Severity justification:\n"
+    "[1 sentence — why this severity level]\n\n"
+    "Be specific. Reference actual metric values. Never be generic. "
+    "If only latency is bad do NOT mention DNS."
 )
 
 _CHAT_SYSTEM_PROMPT = (

@@ -35,6 +35,9 @@ from loguru import logger
 
 from backend.api.dependencies import get_anomaly_detector, severity_recommendation
 from backend.api.schemas import (
+    AlertRecentResponse,
+    AlertSchema,
+    AlertStatsSchema,
     AnomalyDetectRequest,
     AnomalyDetectResponse,
     AnomalyListResponse,
@@ -431,4 +434,172 @@ async def get_anomaly_stats(request: Request) -> AnomalyStatsResponse:
         most_common_severity=most_common_severity,
         worst_feature_overall=worst_feature,
         detection_breakdown=breakdown,
+    )
+
+
+# ─── Alerts sub-router ────────────────────────────────────────────────────────
+# Mounted in main.py with prefix="/alerts" → exposes /alerts/recent, /alerts/stats
+
+alerts_router = APIRouter()
+
+
+@alerts_router.get(
+    "/recent",
+    response_model=AlertRecentResponse,
+    summary="Fetch recent fired alerts",
+)
+async def get_recent_alerts(
+    request: Request,
+    host_id: Optional[str] = Query(None, description="Filter alerts to a single host"),
+    severity: Optional[str] = Query(
+        None,
+        description="Filter by severity: critical / high / medium / low",
+    ),
+    limit: int = Query(50, ge=1, le=200, description="Max alerts to return [1, 200]"),
+) -> AlertRecentResponse:
+    """
+    Return recent fired alerts from the AlertManager's in-memory store.
+
+    Filters are optional and combined with AND semantics.  Results are
+    returned newest-first and capped at ``limit``.
+
+    Args:
+        request:  Provides access to ``app.state.alert_manager``.
+        host_id:  Optional host filter.
+        severity: Optional severity filter.
+        limit:    Maximum alerts in the response.
+
+    Returns:
+        AlertRecentResponse with matching alerts and applied filter summary.
+
+    Raises:
+        HTTPException 503: AlertManager not initialised.
+        HTTPException 422: Invalid severity value.
+    """
+    alert_manager = getattr(request.app.state, "alert_manager", None)
+    if alert_manager is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="AlertManager is not initialised.",
+        )
+
+    valid_severities = {"critical", "high", "medium", "low"}
+    if severity and severity.lower() not in valid_severities:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"severity must be one of: {', '.join(sorted(valid_severities))}",
+        )
+
+    alerts = alert_manager.get_recent_alerts(
+        host_id=host_id,
+        severity=severity,
+        limit=limit,
+    )
+
+    alert_schemas = [
+        AlertSchema(
+            alert_id=a.alert_id,
+            host_id=a.host_id,
+            severity=a.severity,
+            combined_score=a.combined_score,
+            worst_feature=a.worst_feature,
+            top_contributing_features=a.top_contributing_features,
+            message=a.message,
+            timestamp=a.timestamp,
+            acknowledged=a.acknowledged,
+            resolved=a.resolved,
+            resolution_timestamp=a.resolution_timestamp,
+        )
+        for a in alerts
+    ]
+
+    applied: dict[str, str] = {}
+    if host_id:
+        applied["host_id"] = host_id
+    if severity:
+        applied["severity"] = severity.lower()
+
+    return AlertRecentResponse(
+        alerts=alert_schemas,
+        total_count=len(alert_schemas),
+        filters_applied=applied,
+    )
+
+
+@alerts_router.put(
+    "/{alert_id}/acknowledge",
+    summary="Acknowledge a fired alert",
+)
+async def acknowledge_alert(
+    alert_id: str,
+    request: Request,
+) -> dict:
+    """
+    Mark an alert as acknowledged by an operator.
+
+    Args:
+        alert_id: UUID of the alert to acknowledge.
+        request:  Provides access to ``app.state.alert_manager``.
+
+    Returns:
+        JSON with ``alert_id`` and ``acknowledged: True``.
+
+    Raises:
+        HTTPException 503: AlertManager not initialised.
+        HTTPException 404: Alert not found.
+    """
+    alert_manager = getattr(request.app.state, "alert_manager", None)
+    if alert_manager is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="AlertManager is not initialised.",
+        )
+
+    found = alert_manager.acknowledge(alert_id)
+    if not found:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"Alert {alert_id!r} not found.",
+        )
+
+    return {"alert_id": alert_id, "acknowledged": True}
+
+
+@alerts_router.get(
+    "/stats",
+    response_model=AlertStatsSchema,
+    summary="Aggregate alert statistics",
+)
+async def get_alert_stats(request: Request) -> AlertStatsSchema:
+    """
+    Return aggregate statistics from the AlertManager's in-memory history.
+
+    Includes total fired and suppressed counts, per-severity and per-host
+    breakdowns, the most-alerted host, and the most recent alert timestamp.
+
+    Args:
+        request: Provides access to ``app.state.alert_manager``.
+
+    Returns:
+        AlertStatsSchema with all computed statistics.
+
+    Raises:
+        HTTPException 503: AlertManager not initialised.
+    """
+    alert_manager = getattr(request.app.state, "alert_manager", None)
+    if alert_manager is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="AlertManager is not initialised.",
+        )
+
+    stats = alert_manager.get_stats()
+
+    return AlertStatsSchema(
+        total_alerts_fired=stats.total_alerts_fired,
+        alerts_suppressed=stats.alerts_suppressed,
+        alerts_by_severity=stats.alerts_by_severity,
+        alerts_by_host=stats.alerts_by_host,
+        most_affected_host=stats.most_affected_host,
+        last_alert_timestamp=stats.last_alert_timestamp,
     )

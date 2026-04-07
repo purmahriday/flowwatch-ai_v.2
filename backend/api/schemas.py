@@ -100,6 +100,10 @@ class TelemetryIngestResponse(BaseModel):
     anomaly_result: Optional[CombinedAnomalyResultSchema] = None
     window_ready: bool = Field(description="True once 30 records are buffered for this host")
     message: str
+    alert_id: Optional[str] = Field(
+        None,
+        description="UUID of the fired Alert, if an alert was triggered for this record",
+    )
 
 
 class HostStatusResponse(BaseModel):
@@ -248,3 +252,55 @@ class AssistantChatResponse(BaseModel):
     host_id: str
     response: str
     conversation_history: list[ChatMessage]
+
+
+# ─── Alert schemas ────────────────────────────────────────────────────────────
+
+
+class AlertSchema(BaseModel):
+    """
+    A fired alert record returned by the alerts API.
+
+    Mirrors ``alerting.alert_manager.Alert`` for wire serialisation.
+    """
+
+    alert_id: str = Field(description="UUID4 identifier for this alert")
+    host_id: str
+    severity: str = Field(description="critical / high / medium / low")
+    combined_score: float = Field(description="Ensemble anomaly score that triggered this alert [0, 1]")
+    worst_feature: str = Field(description="Most degraded network metric (LSTM analysis)")
+    top_contributing_features: list[str] = Field(description="Top-3 IF deviation features")
+    message: str = Field(description="Human-readable alert summary")
+    timestamp: datetime = Field(description="UTC datetime when the alert was created")
+    acknowledged: bool
+    resolved: bool
+    resolution_timestamp: Optional[datetime] = None
+
+
+class AlertRecentResponse(BaseModel):
+    """Response for GET /alerts/recent."""
+
+    alerts: list[AlertSchema]
+    total_count: int
+    filters_applied: dict[str, str] = Field(
+        description="Active filters: host_id and/or severity if provided"
+    )
+
+
+class AlertStatsSchema(BaseModel):
+    """
+    Aggregate alert statistics returned by GET /alerts/stats.
+
+    Mirrors ``alerting.alert_manager.AlertManagerStats``.
+    """
+
+    total_alerts_fired: int
+    alerts_suppressed: int
+    alerts_by_severity: dict[str, int] = Field(
+        description="Count of fired alerts per severity level"
+    )
+    alerts_by_host: dict[str, int] = Field(
+        description="Count of fired alerts per host"
+    )
+    most_affected_host: str
+    last_alert_timestamp: Optional[datetime] = None

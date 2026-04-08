@@ -308,10 +308,11 @@ export function AlertFeed({ onViewAnomalies }: AlertFeedProps) {
       subtitle="Peak metrics over the last 5 minutes"
       headerAction={headerAction}
       className="h-full flex flex-col"
+      bodyClassName="flex-1 flex flex-col min-h-0 overflow-hidden"
     >
-      {error && <AlertBanner level="error" message={error} className="mb-3" />}
+      {error && <AlertBanner level="error" message={error} className="shrink-0 mb-3" />}
 
-      <div className="flex-1 overflow-y-auto space-y-2 max-h-[480px] pr-1">
+      <div className="flex-1 min-h-0 overflow-y-auto space-y-2 pr-1">
         {alerts.length === 0 ? (
           <div className="flex flex-col items-center justify-center h-44 text-center">
             <span className="text-2xl mb-2">✓</span>

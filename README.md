@@ -21,6 +21,10 @@ FlowWatch AI monitors network health across multiple hosts in real time. It trac
 
 It runs two ML models on this data simultaneously, combines their outputs into a single anomaly score, and when something looks wrong it uses Claude (Anthropic's LLM) to explain the root cause in plain English.
 
+## Live Dashboard
+
+![FlowWatch AI Dashboard](docs/dashboard-screenshot.png)
+
 ## Architecture
 
 I designed this architecture by mapping out the data flow on paper first. The core idea was to keep each layer independent — the pipeline doesn't care about the models, the models don't care about the API, the API doesn't care about the frontend.
@@ -85,9 +89,9 @@ I designed this architecture by mapping out the data flow on paper first. The co
            |
            ▼
   ┌──────────────────────────────┐
-  │   Next.js Dashboard          │  ← not built yet
-  │   localhost:3000             │    real-time charts + anomaly feed
-  └──────────────────────────────┘
+  │   Next.js Dashboard          │  ← LIVE at localhost:3000
+  │   localhost:3000             │    Real-time charts, alert feed,
+  └──────────────────────────────┘    AI assistant
 ```
 
 ---
@@ -120,7 +124,7 @@ The hardest part wasn't the architecture — it was tuning. Finding the right co
 | **LLM Assistant** | Anthropic Claude API | Root cause explanation in plain English |
 | **Database** | TimescaleDB | PostgreSQL optimized for time-series |
 | **Cache** | Redis | Fast feature vector lookup |
-| **Frontend** | Next.js 14 + Recharts | Real-time dashboard (in progress) |
+| **Frontend** | Next.js 14 + Recharts | Real-time dashboard |
 | **Infra** | Docker Compose → AWS EC2 | Local first, cloud later |
 
 ## Feature Engineering
@@ -159,12 +163,66 @@ See [CLAUDE.md](CLAUDE.md) for the full project structure and architectural deci
 - [✅] Phase 3: Feature engineering pipeline
 - [✅] Phase 4: Isolation Forest model
 - [✅] Phase 5: LSTM model + training notebook
-- [ ] Phase 6: FastAPI inference endpoints
-- [ ] Phase 7: LLM RCA assistant
-- [ ] Phase 8: Alert manager + CloudWatch
-- [ ] Phase 9: Next.js frontend dashboard
-- [ ] Phase 10: Docker Compose full-stack wiring
-- [ ] Phase 11: AWS deployment
+- [✅] Phase 6: FastAPI inference endpoints
+- [✅] Phase 7: LLM RCA assistant
+- [✅] Phase 8: Alert manager + CloudWatch integration
+- [✅] Phase 9: Next.js real-time dashboard
+- [⏳] Phase 10: Docker Compose full-stack wiring
+- [⏳] Phase 11: AWS deployment
+- [⏳] Phase 12: Real website monitoring (google.com, github.com etc.)
+
+## Results
+
+### Dashboard Features (Live)
+- Real-time latency charts for 5 hosts updating every 5 seconds
+- Alert feed showing critical/high severity incidents only
+- Per-metric indicators showing exactly which metric is anomalous
+- AI-powered root cause analysis with 4-section structured diagnosis
+- Host health status table sorted by severity
+- 1,159+ telemetry records processed in testing
+
+### ML Model Performance
+- LSTM Autoencoder trained in 2.5 seconds on CPU
+- Isolation Forest trained in 0.55 seconds
+- Combined inference latency: ~40ms per prediction
+- Anomaly detection confirmed on CASCADE events with combined score of 0.925/1.0
+- Successfully distinguishes between:
+  - Latency spikes (network congestion)
+  - Packet loss (physical layer issues)
+  - DNS failures (resolver/poisoning attacks)
+  - Jitter anomalies (wireless interference)
+  - CASCADE events (full outages/DDoS)
+
+### AI Assistant Quality
+- Gives specific diagnosis based on which metrics are anomalous
+- References actual metric values in analysis
+- Provides runnable terminal commands for investigation
+- Different root cause for each anomaly type — not generic
+
+## Running Locally
+
+**Terminal 1 — Backend:**
+```bash
+cd flowwatch-ai
+pip install -r backend/requirements.txt
+uvicorn backend.api.main:app --reload
+```
+
+**Terminal 2 — Frontend:**
+```bash
+cd flowwatch-ai/frontend
+npm install
+npm run dev
+```
+
+**Terminal 3 — Send test data:**
+```bash
+python scripts/populate_dashboard.py
+```
+
+Then open:
+- Dashboard: http://localhost:3000
+- API docs: http://localhost:8000/docs
 
 ## License
 

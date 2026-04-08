@@ -370,11 +370,12 @@ export function RCAPanel({ selectedAnomaly, latestAnomaly }: RCAPanelProps) {
       title="AI Assistant"
       subtitle="Claude-powered root cause analysis"
       className="h-full flex flex-col"
+      bodyClassName="flex-1 flex flex-col min-h-0 overflow-hidden"
     >
-      {error && <AlertBanner level="error" message={error} className="mb-3" />}
+      {error && <AlertBanner level="error" message={error} className="shrink-0 mb-3" />}
 
-      {/* Message history */}
-      <div className="flex-1 overflow-y-auto mb-3 max-h-64 pr-1">
+      {/* Message history — grows to fill all available card space */}
+      <div className="flex-1 min-h-0 overflow-y-auto mb-3 pr-1">
         {messages.map((msg, i) => (
           <MessageBubble key={i} msg={msg} />
         ))}
@@ -391,13 +392,13 @@ export function RCAPanel({ selectedAnomaly, latestAnomaly }: RCAPanelProps) {
         <div ref={messagesEndRef} />
       </div>
 
-      {/* Quick action */}
+      {/* Quick action — shrink-0 so it never scrolls out of view */}
       {latestAnomaly && (
         <button
           onClick={() => runAnalysis(latestAnomaly)}
           disabled={isLoading}
           className="
-            w-full mb-2 px-3 py-2 text-xs font-medium rounded-lg
+            shrink-0 w-full mb-2 px-3 py-2 text-xs font-medium rounded-lg
             bg-blue-600/20 text-blue-400 border border-blue-600/30
             hover:bg-blue-600/30 transition-colors
             disabled:opacity-50 disabled:cursor-not-allowed
@@ -407,8 +408,8 @@ export function RCAPanel({ selectedAnomaly, latestAnomaly }: RCAPanelProps) {
         </button>
       )}
 
-      {/* Chat input */}
-      <div className="flex gap-2">
+      {/* Chat input — always pinned to bottom */}
+      <div className="shrink-0 flex gap-2">
         <input
           type="text"
           value={input}

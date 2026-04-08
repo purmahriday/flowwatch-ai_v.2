@@ -36,9 +36,11 @@ class ErrorBoundary extends Component<
   render() {
     if (this.state.hasError) {
       return (
-        <div className="bg-gray-800 border border-red-700/50 rounded-xl p-5 text-red-400 text-sm">
-          <p className="font-semibold">{this.props.name} failed to render</p>
-          <p className="text-xs text-gray-500 mt-1">{this.state.message}</p>
+        <div className="bg-gray-800 border border-red-700/50 rounded-xl p-5 text-red-400 text-sm h-full flex items-center justify-center">
+          <div>
+            <p className="font-semibold">{this.props.name} failed to render</p>
+            <p className="text-xs text-gray-500 mt-1">{this.state.message}</p>
+          </div>
         </div>
       );
     }
@@ -62,7 +64,7 @@ function StatCard({
   loading?: boolean;
 }) {
   return (
-    <div className="bg-gray-800 border border-gray-700 rounded-xl px-5 py-4">
+    <div className="bg-gray-800 border border-gray-700 rounded-xl px-4 py-3 sm:px-5 sm:py-4">
       {loading ? (
         <div className="animate-pulse space-y-2">
           <div className="h-6 bg-gray-700 rounded w-1/2" />
@@ -70,15 +72,11 @@ function StatCard({
         </div>
       ) : (
         <>
-          <p
-            className={`text-2xl font-bold tabular-nums ${
-              accent ? 'text-red-400' : 'text-gray-100'
-            }`}
-          >
+          <p className={`text-xl sm:text-2xl font-bold tabular-nums ${accent ? 'text-red-400' : 'text-gray-100'}`}>
             {value}
           </p>
           <p className="text-xs text-gray-400 mt-0.5 font-medium">{label}</p>
-          {sub && <p className="text-xs text-gray-600 mt-0.5">{sub}</p>}
+          {sub && <p className="text-xs text-gray-600 mt-0.5 hidden sm:block">{sub}</p>}
         </>
       )}
     </div>
@@ -115,9 +113,7 @@ export default function DashboardPage() {
       if (!mountedRef.current) return;
 
       if (healthData.status === 'fulfilled') setHealth(healthData.value);
-      if (alertStatsData.status === 'fulfilled') {
-        setAlertStats(alertStatsData.value);
-      }
+      if (alertStatsData.status === 'fulfilled') setAlertStats(alertStatsData.value);
       if (anomalyData.status === 'fulfilled') {
         setLatestAnomaly(anomalyData.value.anomalies[0] ?? null);
       }
@@ -142,11 +138,17 @@ export default function DashboardPage() {
   const modelsLoaded = health?.models_loaded ?? false;
 
   return (
-    <div className="min-h-screen bg-gray-900 text-gray-100">
-      {/* ── Header ─────────────────────────────────────────────────────────── */}
-      <header className="sticky top-0 z-10 bg-gray-900/95 backdrop-blur border-b border-gray-800 px-6 py-3">
+    /*
+     * Outer shell
+     * ───────────
+     * Mobile  : min-h-screen so content can grow; page scrolls naturally.
+     * Desktop : h-screen + overflow-hidden so panels scroll independently.
+     */
+    <div className="bg-gray-900 text-gray-100 flex flex-col min-h-screen lg:h-screen lg:overflow-hidden">
+
+      {/* ── Header — always sticky at the top ─────────────────────────────── */}
+      <header className="shrink-0 sticky top-0 z-10 bg-gray-900/95 backdrop-blur border-b border-gray-800 px-4 sm:px-6 py-3">
         <div className="max-w-screen-2xl mx-auto flex items-center justify-between gap-4">
-          {/* Logo */}
           <div className="flex items-center gap-3">
             <div className="w-8 h-8 rounded-lg bg-blue-600 flex items-center justify-center text-white font-bold text-sm select-none">
               FW
@@ -157,16 +159,13 @@ export default function DashboardPage() {
             </div>
           </div>
 
-          {/* Status indicators */}
           <div className="flex items-center gap-3 text-xs">
             <Badge variant={isOnline ? 'online' : 'offline'} dot>
               {isOnline ? 'ONLINE' : 'OFFLINE'}
             </Badge>
-
             <span className={`hidden sm:inline font-medium ${modelsLoaded ? 'text-green-400' : 'text-gray-500'}`}>
               {modelsLoaded ? '⬡ Models loaded' : '○ Models offline'}
             </span>
-
             {lastUpdated && (
               <span className="hidden md:inline text-gray-600">
                 Updated {lastUpdated.toLocaleTimeString()}
@@ -176,65 +175,87 @@ export default function DashboardPage() {
         </div>
       </header>
 
-      <main className="max-w-screen-2xl mx-auto px-4 sm:px-6 py-5 space-y-5">
-        {/* ── Stats row ──────────────────────────────────────────────────── */}
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <StatCard
-            label="Records Processed"
-            value={(health?.total_records_processed ?? 0).toLocaleString()}
-            loading={headerLoading}
-          />
-          <StatCard
-            label="Active Alerts"
-            value={alertStats?.total_alerts_fired ?? 0}
-            sub="all time"
-            accent={(alertStats?.total_alerts_fired ?? 0) > 0}
-            loading={headerLoading}
-          />
-          <StatCard
-            label="Critical Alerts"
-            value={alertStats?.alerts_by_severity?.['critical'] ?? 0}
-            accent={(alertStats?.alerts_by_severity?.['critical'] ?? 0) > 0}
-            loading={headerLoading}
-          />
-          <StatCard
-            label="System Uptime"
-            value={health ? formatUptime(health.uptime_seconds) : '—'}
-            sub={alertStats?.most_affected_host !== 'none' ? `Worst: ${alertStats?.most_affected_host}` : undefined}
-            loading={headerLoading}
-          />
-        </div>
+      {/*
+       * ── Content area ──────────────────────────────────────────────────────
+       * Mobile  : overflow-y-auto → this scrolls as one unit (natural UX).
+       * Desktop : overflow-hidden → locked; each panel handles its own scroll.
+       */}
+      <main className="flex-1 lg:min-h-0 flex flex-col overflow-y-auto lg:overflow-hidden">
+        {/* Max-width + padding wrapper — grows to fill main on desktop */}
+        <div className="max-w-screen-2xl mx-auto w-full px-4 sm:px-6 py-4 flex flex-col gap-4 flex-1 lg:min-h-0">
 
-        {/* ── Main grid: chart (60%) + alert feed (40%) ─────────────────── */}
-        <div className="grid grid-cols-1 xl:grid-cols-5 gap-4">
-          <div className="xl:col-span-3">
-            <ErrorBoundary name="Telemetry Chart">
-              <TelemetryChart />
-            </ErrorBoundary>
-          </div>
-          <div className="xl:col-span-2">
-            <ErrorBoundary name="Alert Feed">
-              <AlertFeed onViewAnomalies={setSelectedAlert} />
-            </ErrorBoundary>
-          </div>
-        </div>
-
-        {/* ── Bottom grid: host table (50%) + RCA panel (50%) ──────────── */}
-        <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
-          <ErrorBoundary name="Host Status Table">
-            <HostStatusTable />
-          </ErrorBoundary>
-          <ErrorBoundary name="RCA Panel">
-            <RCAPanel
-              selectedAnomaly={selectedAnomaly}
-              latestAnomaly={latestAnomaly}
+          {/* ── Stats row — fixed height, never grows ──────────────────── */}
+          <div className="shrink-0 grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <StatCard
+              label="Records Processed"
+              value={(health?.total_records_processed ?? 0).toLocaleString()}
+              loading={headerLoading}
             />
-          </ErrorBoundary>
+            <StatCard
+              label="Active Alerts"
+              value={alertStats?.total_alerts_fired ?? 0}
+              sub="all time"
+              accent={(alertStats?.total_alerts_fired ?? 0) > 0}
+              loading={headerLoading}
+            />
+            <StatCard
+              label="Critical Alerts"
+              value={alertStats?.alerts_by_severity?.['critical'] ?? 0}
+              accent={(alertStats?.alerts_by_severity?.['critical'] ?? 0) > 0}
+              loading={headerLoading}
+            />
+            <StatCard
+              label="System Uptime"
+              value={health ? formatUptime(health.uptime_seconds) : '—'}
+              sub={alertStats?.most_affected_host !== 'none' ? `Worst: ${alertStats?.most_affected_host}` : undefined}
+              loading={headerLoading}
+            />
+          </div>
+
+          {/*
+           * ── Top panels: chart (60%) + alert feed (40%) ────────────────
+           * Mobile  : single column, each panel natural height.
+           * Desktop : 3/5 + 2/5 split, row grows to fill half of remaining.
+           */}
+          <div className="grid grid-cols-1 lg:grid-cols-5 gap-4 lg:flex-1 lg:min-h-0">
+            <div className="lg:col-span-3 lg:min-h-0 lg:h-full">
+              <ErrorBoundary name="Telemetry Chart">
+                <TelemetryChart />
+              </ErrorBoundary>
+            </div>
+            <div className="lg:col-span-2 lg:min-h-0 lg:h-full">
+              <ErrorBoundary name="Alert Feed">
+                <AlertFeed onViewAnomalies={setSelectedAlert} />
+              </ErrorBoundary>
+            </div>
+          </div>
+
+          {/*
+           * ── Bottom panels: host table (50%) + AI assistant (50%) ──────
+           * Mobile  : single column, each panel natural height.
+           * Desktop : equal split, row grows to fill half of remaining.
+           */}
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:flex-1 lg:min-h-0">
+            <div className="lg:min-h-0 lg:h-full">
+              <ErrorBoundary name="Host Status Table">
+                <HostStatusTable />
+              </ErrorBoundary>
+            </div>
+            <div className="lg:min-h-0 lg:h-full">
+              <ErrorBoundary name="RCA Panel">
+                <RCAPanel
+                  selectedAnomaly={selectedAnomaly}
+                  latestAnomaly={latestAnomaly}
+                />
+              </ErrorBoundary>
+            </div>
+          </div>
+
         </div>
       </main>
 
       {/* ── Footer ─────────────────────────────────────────────────────────── */}
-      <footer className="text-center py-4 text-xs text-gray-700 border-t border-gray-800 mt-6">
+      <footer className="shrink-0 text-center py-3 text-xs text-gray-700 border-t border-gray-800">
         FlowWatch AI · Phase 9 · Powered by Claude
       </footer>
 

@@ -306,6 +306,11 @@ Track progress here as features are completed.
 | 2026-04-07 | RCA section boxes have colored left borders (blue/purple/red/orange) | Visual hierarchy matches NOC operator mental model             |
 | 2026-04-07 | rca_agent.py system prompt updated with metric-specific rules   | Prevents Claude from citing irrelevant metrics (e.g. DNS for latency-only anomaly) |
 | 2026-04-07 | _DEFAULT_MAX_TOKENS bumped 500→800 in rca_agent.py             | New specific prompt requires more completion space              |
+| 2026-04-07 | Card.tsx gains bodyClassName prop for flex-1 height chains      | Panel scroll relies on flex-1 propagating through Card's body div |
+| 2026-04-07 | page.tsx: min-h-screen mobile / h-screen lg:overflow-hidden desktop | Panels scroll independently on desktop; page scrolls on mobile |
+| 2026-04-07 | Grid rows use lg:flex-1 lg:min-h-0 instead of fixed heights     | Panels share remaining viewport height equally without fixed px |
+| 2026-04-07 | Breakpoints changed from xl: to lg: for chart/alert/bottom grids | Dashboard usable on 1024px screens (tablets in landscape)      |
+| 2026-04-07 | RCAPanel messages area: max-h-64 removed, flex-1 min-h-0 added  | AI analysis sections fully visible; quick-action + input pinned |
 
 ---
 

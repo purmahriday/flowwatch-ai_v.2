@@ -82,10 +82,11 @@ class TelemetryIngestRequest(BaseModel):
     @field_validator("host_id")
     @classmethod
     def validate_host_id_pattern(cls, v: str) -> str:
-        if not re.match(r"^host-\d{2}$", v):
+        # Accept legacy host-NN format OR any valid hostname/domain/IP
+        if not re.match(r"^[a-zA-Z0-9]([a-zA-Z0-9\-\.]{0,61}[a-zA-Z0-9])?$", v):
             raise ValueError(
-                "host_id must match pattern host-XX where XX is two digits "
-                "(e.g. host-01, host-12)"
+                "host_id must be a valid hostname or domain name "
+                "(e.g. host-01, google.com, 1.1.1.1)"
             )
         return v
 

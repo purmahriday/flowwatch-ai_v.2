@@ -15,6 +15,7 @@ import {
 import { getLatestAnomalies, getRecentTelemetry, type TelemetryRecord } from '@/lib/api';
 import {
   CHART_POINTS_PER_HOST,
+  COLOR_PALETTE,
   DEFAULT_HOST_COLOR,
   HOST_COLORS,
   LATENCY_THRESHOLD_MS,
@@ -129,6 +130,18 @@ export function TelemetryChart() {
     return Array.from(seen).sort();
   }, [records]);
 
+  // Assign a stable color to every host: explicit map first, then palette by index.
+  const hostColors = useMemo((): Record<string, string> => {
+    const map: Record<string, string> = {};
+    hosts.forEach((hostId, idx) => {
+      map[hostId] =
+        HOST_COLORS[hostId] ??
+        COLOR_PALETTE[idx % COLOR_PALETTE.length] ??
+        DEFAULT_HOST_COLOR;
+    });
+    return map;
+  }, [hosts]);
+
   // Merge records into unified per-timestamp rows, keep last CHART_POINTS_PER_HOST
   const chartData = useMemo((): ChartPoint[] => {
     const map = new Map<string, ChartPoint>();
@@ -215,7 +228,7 @@ export function TelemetryChart() {
                 key={hostId}
                 type="monotone"
                 dataKey={hostId}
-                stroke={HOST_COLORS[hostId] ?? DEFAULT_HOST_COLOR}
+                stroke={hostColors[hostId]}
                 strokeWidth={2}
                 dot={(props: Record<string, unknown>) => (
                   <AnomalyDot

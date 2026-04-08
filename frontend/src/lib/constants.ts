@@ -11,14 +11,39 @@ export const LATENCY_THRESHOLD_MS = 200;
 
 /** Color assigned to each host in charts and status indicators. */
 export const HOST_COLORS: Record<string, string> = {
+  // Legacy simulated host format
   'host-01': '#3b82f6', // blue
   'host-02': '#22c55e', // green
   'host-03': '#eab308', // yellow
   'host-04': '#f97316', // orange
   'host-05': '#ef4444', // red
+  // Phase 12 real website hosts
+  'google.com':     '#3b82f6', // blue
+  'github.com':     '#22c55e', // green
+  'cloudflare.com': '#f97316', // orange
+  'amazon.com':     '#a855f7', // purple
+  '1.1.1.1':        '#06b6d4', // cyan
 };
 
-/** Fallback color for hosts not in HOST_COLORS. */
+/**
+ * Ordered color palette used to assign colors dynamically to hosts that are
+ * not listed in HOST_COLORS. Colors are assigned by the host's sort index,
+ * so they are stable across renders as long as the host set doesn't change.
+ */
+export const COLOR_PALETTE: readonly string[] = [
+  '#3b82f6', // blue
+  '#22c55e', // green
+  '#f97316', // orange
+  '#a855f7', // purple
+  '#06b6d4', // cyan
+  '#eab308', // yellow
+  '#ef4444', // red
+  '#ec4899', // pink
+  '#14b8a6', // teal
+  '#f59e0b', // amber
+];
+
+/** Fallback color for hosts not in HOST_COLORS and beyond the palette range. */
 export const DEFAULT_HOST_COLOR = '#6b7280';
 
 /** Tailwind + hex color palette for severity levels. */

@@ -74,7 +74,8 @@ flowwatch-ai/
 │   ├── docker-compose.override.yml # Dev hot-reload overrides
 │   └── docker-compose.prod.yml
 ├── scripts/
-│   └── init_kinesis.py         # Create Kinesis stream in LocalStack
+│   ├── init_kinesis.py         # Create Kinesis stream in LocalStack
+│   └── real_producer.py        # Phase 12: real website monitor (pings 5 live targets)
 ├── notebooks/
 ├── data/
 └── .env.example
@@ -271,6 +272,7 @@ DB is optional — if `DATABASE_URL` is unset or unreachable, the backend falls 
 - [~] Phase 9: Next.js frontend dashboard
 - [~] Phase 10: Docker Compose full-stack wiring
 - [ ] Phase 11: AWS deployment (EC2 + Kinesis + CloudWatch)
+- [X] Phase 12: Real website monitoring (scripts/real_producer.py)
 
 ---
 
@@ -291,6 +293,30 @@ DB is optional — if `DATABASE_URL` is unset or unreachable, the backend falls 
 | 2026-04-07 | AlertFeed as primary view; anomalies as detail          | Alerts are the operator-facing surface          |
 | 2026-04-07 | DB writes dual-path: memory (fast) + TimescaleDB (persist) | Survives restarts without slowing ingest    |
 | 2026-04-07 | DB optional: graceful fallback to in-memory on failure  | Stack works without a running database          |
+| 2026-04-08 | host_id validator relaxed to accept domain names/IPs    | Phase 12 uses google.com etc as host identifiers|
+| 2026-04-08 | real_producer.py uses HEAD×3 per target, ThreadPoolExecutor | Sequential pings give real jitter; parallel targets keep round fast |
+
+---
+
+## Running Phase 12 (Real Website Monitor)
+
+```bash
+# Dry-run — print measurements without sending to API:
+python scripts/real_producer.py --dry-run
+
+# Fill sliding window on first launch (sends 32 rounds to warm up ML models):
+python scripts/real_producer.py --warmup
+
+# Continuous monitoring, one round every 10 s (default):
+python scripts/real_producer.py
+
+# Custom interval:
+python scripts/real_producer.py --interval 15
+```
+
+Targets: google.com, github.com, cloudflare.com, amazon.com, 1.1.1.1.
+Each target appears as its own host in the dashboard.
+Requires backend rebuilt from `flowwatch-ai-phase12/` (schema accepts domain host_ids).
 
 ---
 

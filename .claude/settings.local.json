@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python scripts/real_producer.py --dry-run --interval 999)",
+      "Bash(mkdir -p C:/tmp)",
+      "Bash(python scripts/real_producer.py --dry-run --interval 9999)",
+      "Bash(python -c ':*)",
+      "Bash(curl:*)",
+      "Bash(python:*)",
+      "Bash(cp backend/models/artifacts/isolation_forest.joblib \"C:/Users/hrida/flowwatch-ai/backend/models/artifacts/isolation_forest.joblib\")",
+      "Bash(cp backend/models/artifacts/lstm_model.pt \"C:/Users/hrida/flowwatch-ai/backend/models/artifacts/lstm_model.pt\")",
+      "Bash(docker-compose:*)"
+    ]
+  }
+}

@@ -21,7 +21,13 @@ It runs two ML models on this data simultaneously, combines their outputs into a
 
 ## Live Dashboard
 
-<img width="602" height="679" alt="Picture1" src="https://github.com/user-attachments/assets/3f032a60-7847-4778-bb8d-852440886ad5" />
+<img width="1166" height="899" alt="image" src="https://github.com/user-attachments/assets/73e38730-178d-41b2-b74a-802be7feaa3d" />
+
+<img width="505" height="854" alt="image" src="https://github.com/user-attachments/assets/0f0e4202-0eb8-45c6-9ea3-8a17cd5dc11f" />
+
+<img width="366" height="403" alt="image" src="https://github.com/user-attachments/assets/5b7797e0-78cf-4380-a7e2-895711651746" />
+
+
 
 
 ## Architecture

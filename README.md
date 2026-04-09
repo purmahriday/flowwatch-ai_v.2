@@ -4,12 +4,14 @@ Real-time network monitoring and anomaly detection system powered by ML and an L
 
 **Why I Built This**
 
-After finishing my previous project - MedSynth, a multi-agent RAG system for clinical summarization - I wanted to tackle something completely different. Something closer to systems and infrastructure rather than NLP. As Suggested to me by Fred Weitendorf the Founder/ CEO @Accretional in LinkedIn
-I kept coming back to one question: how do large tech companies know their network is degrading before users start complaining? I wanted to understand how that actually works under the hood — not just read about it, but build it myself from scratch.
+After finishing my previous project — MedSynth, a multi-agent RAG system for clinical summarization — I wanted to tackle something completely different. Something closer to systems and infrastructure rather than NLP. As suggested to me by Fred Weitendorf, Founder/CEO @Accretional on LinkedIn, I kept coming back to one question: how do large tech companies know their network is degrading before users start complaining? I wanted to understand how that actually works under the hood — not just read about it, but build it myself from scratch.
+
 So I started FlowWatch AI. The goal was to build a real-time pipeline that ingests live network telemetry, detects anomalies using ML, and explains why something is wrong using an LLM assistant — all wired together end to end.
+
 This is the most systems-heavy project I've worked on. I'm learning as I build.
 
 **What It Does**
+
 FlowWatch AI monitors network health across multiple hosts in real time. It tracks four key signals per host every second:
 
 - Latency — how long packets take to travel
@@ -35,74 +37,74 @@ It runs two ML models on this data simultaneously, combines their outputs into a
 I designed this architecture by mapping out the data flow on paper first. The core idea was to keep each layer independent — the pipeline doesn't care about the models, the models don't care about the API, the API doesn't care about the frontend.
 
 ```
-[Network Hosts — simulated for now, real agents in production]
-  host-01  host-02  host-03  host-04  host-05
-      |        |        |        |        |
-      └────────┴────────┴────────┴────────┘
-                         |
-                         ▼
-            ┌─────────────────────────┐
-            │     AWS Kinesis Stream  │
-            │   (LocalStack locally)  │  ← still learning how
-            │  partitioned by host_id │    Kinesis sharding works
-            └────────────┬────────────┘
-                         |
-                         ▼
-            ┌─────────────────────────┐
-            │  Consumer + Preprocessor│  ← validates with Pydantic
-            │                         │    normalizes to 0-1 range
-            │                         │    computes health score
-            └────────────┬────────────┘
-                         |
-                         ▼
-            ┌─────────────────────────┐
-            │   Feature Engineering   │  ← 19 features per host
-            │   Sliding Window: 30s   │    statistical + temporal
-            └──────────┬──────────────┘
-                       |
-            ┌──────────┴──────────┐
-            ▼                     ▼
-  ┌──────────────────┐  ┌──────────────────────┐
-  │  LSTM Autoencoder│  │   Isolation Forest   │
-  │   (PyTorch)      │  │   (Scikit-learn)     │
-  │                  │  │                      │
-  │  looks at last   │  │  looks at right now  │
-  │  30s of history  │  │  is this a snapshot  │
-  │  is this trending│  │  outlier?            │
-  │  toward failure? │  │                      │
-  └────────┬─────────┘  └──────────┬───────────┘
-           │  score × 0.6          │ score × 0.4
-           └──────────┬────────────┘
-                      ▼
-         ┌────────────────────────┐
-         │   Anomaly Aggregator   │
-         │ critical/high/med/low  │
-         └────────────┬───────────┘
-                      |
-           ┌──────────┴──────────┐
-           ▼                     ▼
-  ┌─────────────────┐   ┌──────────────────┐
-  │   FastAPI API   │   │  Alert Manager   │
-  │  localhost:8000 │   │  + CloudWatch    │
-  └────────┬────────┘   └──────────────────┘
-           |
-           ▼
-  ┌──────────────────────────────┐
-  │  Claude RCA Assistant        │  ← "why is host-02 degrading?"
-  │  (Anthropic API)             │    reads telemetry + anomaly context
-  └────────┬─────────────────────┘
-           |
-           ▼
-  ┌──────────────────────────────┐
-  │   Next.js Dashboard          │  ← LIVE at localhost:3000
-  │   localhost:3000             │    Real-time charts, alert feed,
-  └──────────────────────────────┘    AI assistant
+[Real Network Targets — live HTTP probes via real_producer.py]
+  google.com  github.com  cloudflare.com  amazon.com  1.1.1.1
+      |           |              |              |          |
+      └───────────┴──────────────┴──────────────┴──────────┘
+                                 |
+                                 ▼
+                ┌─────────────────────────┐
+                │     AWS Kinesis Stream  │
+                │   (LocalStack locally)  │
+                │  partitioned by host_id │
+                └────────────┬────────────┘
+                             |
+                             ▼
+                ┌─────────────────────────┐
+                │  Consumer + Preprocessor│  ← validates with Pydantic
+                │                         │    normalizes to 0-1 range
+                │                         │    computes health score
+                └────────────┬────────────┘
+                             |
+                             ▼
+                ┌─────────────────────────┐
+                │   Feature Engineering   │  ← 19 features per host
+                │   Sliding Window: 30s   │    statistical + temporal
+                └──────────┬──────────────┘
+                           |
+                ┌──────────┴──────────┐
+                ▼                     ▼
+      ┌──────────────────┐  ┌──────────────────────┐
+      │  LSTM Autoencoder│  │   Isolation Forest   │
+      │   (PyTorch)      │  │   (Scikit-learn)     │
+      │                  │  │                      │
+      │  looks at last   │  │  looks at right now  │
+      │  30s of history  │  │  is this a snapshot  │
+      │  is this trending│  │  outlier?            │
+      │  toward failure? │  │                      │
+      └────────┬─────────┘  └──────────┬───────────┘
+               │  score × 0.6          │ score × 0.4
+               └──────────┬────────────┘
+                          ▼
+             ┌────────────────────────┐
+             │   Anomaly Aggregator   │
+             │ critical/high/med/low  │
+             └────────────┬───────────┘
+                          |
+               ┌──────────┴──────────┐
+               ▼                     ▼
+      ┌─────────────────┐   ┌──────────────────┐
+      │   FastAPI API   │   │  Alert Manager   │
+      │  localhost:8000 │   │  + CloudWatch    │
+      └────────┬────────┘   └──────────────────┘
+               |
+               ▼
+      ┌──────────────────────────────┐
+      │  Claude RCA Assistant        │  ← "why is github.com degrading?"
+      │  (Anthropic API)             │    reads telemetry + anomaly context
+      └────────┬─────────────────────┘
+               |
+               ▼
+      ┌──────────────────────────────┐
+      │   Next.js Dashboard          │  ← localhost:3000
+      │   localhost:3000             │    Real-time charts, alert feed,
+      └──────────────────────────────┘    AI assistant
 ```
 
 ---
 
-
 ### The ML Decision — Why These Two Models
+
 This took me a while to figure out. My previous project used transformer-based architectures, and my first instinct here was to use an Autoencoder for anomaly detection since I'd worked with them before. But autoencoders for network anomaly detection have a real problem — they're good at reconstructing everything, including anomalies, once they've seen enough data. The reconstruction error stops being a reliable signal.
 
 I went back to research and kept seeing Isolation Forest come up specifically for anomaly detection use cases. The intuition behind it is different from most ML models — instead of learning what normal looks like and measuring deviation, it asks "how hard is it to isolate this data point?" Anomalies are easy to isolate because they're already outliers. Normal points take many more splits to separate.
@@ -152,7 +154,7 @@ The time encoding was interesting — if you encode hour as a raw number (0–23
 I want to be upfront about this:
 
 AWS Kinesis and distributed streaming — I understand the concept (a managed stream that multiple producers write to and multiple consumers read from) but I'm still learning shard management and what happens when throughput limits are hit. LocalStack is helping me experiment locally before touching real AWS.
-Docker and container orchestration — I understand what containers are conceptually but Docker Compose with multiple services talking to each other (backend, frontend, database, Redis, LocalStack) is something I'm actively figuring out in Phase 10.
+
 Production ML pipelines — there's a big gap between training a model in a notebook and serving it reliably at scale. I'm learning what that gap looks like by building through it.
 
 The parts I understand well: the LSTM architecture, why autoencoders work for anomaly detection, the feature engineering decisions, and the overall system design.
@@ -167,14 +169,14 @@ See [CLAUDE.md](CLAUDE.md) for the full project structure and architectural deci
 - [✅] Phase 2: Telemetry simulator + Kinesis consumer
 - [✅] Phase 3: Feature engineering pipeline
 - [✅] Phase 4: Isolation Forest model
-- [✅] Phase 5: LSTM model + training notebook
-- [✅] Phase 6: FastAPI inference endpoints
-- [✅] Phase 7: LLM RCA assistant
-- [✅] Phase 8: Alert manager + CloudWatch integration
-- [✅] Phase 9: Next.js real-time dashboard
-- [🔄] Phase 10: Docker Compose full-stack wiring
+- [~] Phase 5: LSTM model + training notebook
+- [~] Phase 6: FastAPI inference endpoints
+- [~] Phase 7: LLM RCA assistant
+- [~] Phase 8: Alert manager + CloudWatch integration
+- [~] Phase 9: Next.js real-time dashboard
+- [~] Phase 10: Docker Compose full-stack wiring
 - [⏳] Phase 11: AWS deployment
-- [⏳] Phase 12: Real website monitoring (google.com, github.com etc.)
+- [✅] Phase 12: Real website monitoring (google.com, github.com, cloudflare.com, amazon.com, 1.1.1.1)
 
 ## Results
 
@@ -206,23 +208,46 @@ See [CLAUDE.md](CLAUDE.md) for the full project structure and architectural deci
 
 ## Running Locally
 
+### Option 1 — Docker Compose (recommended, full stack)
+
+```bash
+# Start all services (TimescaleDB, Redis, LocalStack, backend, frontend)
+docker-compose -f infra/docker-compose.yml up --build
+
+# In a second terminal, init the Kinesis stream after LocalStack is ready
+python scripts/init_kinesis.py
+
+# Start real website monitoring
+python scripts/real_producer.py --warmup
+```
+
+Then open:
+- Dashboard: http://localhost:3000
+- API docs: http://localhost:8000/docs
+
+### Option 2 — Local (no Docker)
+
 **Terminal 1 — Backend:**
 ```bash
-cd flowwatch-ai
+cd flowwatch-ai-phase12
 pip install -r backend/requirements.txt
 uvicorn backend.api.main:app --reload
 ```
 
 **Terminal 2 — Frontend:**
 ```bash
-cd flowwatch-ai/frontend
+cd flowwatch-ai-phase12/frontend
 npm install
 npm run dev
 ```
 
-**Terminal 3 — Send test data:**
+**Terminal 3 — Send real network telemetry:**
 ```bash
-python scripts/populate_dashboard.py
+# Warm up ML models first (sends 32 rounds of data)
+python scripts/real_producer.py --warmup
+
+# Then run continuous monitoring (default: one round every 10s)
+python scripts/real_producer.py
 ```
 
 Then open:

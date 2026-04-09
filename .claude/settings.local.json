@@ -9,7 +9,11 @@
       "Bash(python:*)",
       "Bash(cp backend/models/artifacts/isolation_forest.joblib \"C:/Users/hrida/flowwatch-ai/backend/models/artifacts/isolation_forest.joblib\")",
       "Bash(cp backend/models/artifacts/lstm_model.pt \"C:/Users/hrida/flowwatch-ai/backend/models/artifacts/lstm_model.pt\")",
-      "Bash(docker-compose:*)"
+      "Bash(docker-compose:*)",
+      "Bash(docker start:*)",
+      "Bash(docker exec infra-backend-1:*)",
+      "Bash(docker cp:*)",
+      "Bash(docker restart:*)"
     ]
   }
 }

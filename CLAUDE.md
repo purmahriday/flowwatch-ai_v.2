@@ -75,7 +75,8 @@ flowwatch-ai/
 │   └── docker-compose.prod.yml
 ├── scripts/
 │   ├── init_kinesis.py         # Create Kinesis stream in LocalStack
-│   └── real_producer.py        # Phase 12: real website monitor (pings 5 live targets)
+│   ├── real_producer.py        # Phase 12: real website monitor (pings 5 live targets)
+│   └── retrain_models.py       # Retrain IF + LSTM on real-world latency baselines
 ├── notebooks/
 ├── data/
 └── .env.example
@@ -295,6 +296,9 @@ DB is optional — if `DATABASE_URL` is unset or unreachable, the backend falls 
 | 2026-04-07 | DB optional: graceful fallback to in-memory on failure  | Stack works without a running database          |
 | 2026-04-08 | host_id validator relaxed to accept domain names/IPs    | Phase 12 uses google.com etc as host identifiers|
 | 2026-04-08 | real_producer.py uses HEAD×3 per target, ThreadPoolExecutor | Sequential pings give real jitter; parallel targets keep round fast |
+| 2026-04-08 | HOST_COLORS extended; COLOR_PALETTE added for dynamic hosts | Domain names weren't in the fixed map → fell back to grey |
+| 2026-04-08 | Models retrained on real-world baselines (~210ms normal lat) | Old synthetic baseline was 45ms; real internet is 150-290ms causing false positives |
+| 2026-04-08 | retrain_models.py runs inside the Docker container to match sklearn version | Version mismatch (1.6.1 vs 1.8.0) causes InconsistentVersionWarning |
 
 ---
 

@@ -169,14 +169,13 @@ See [CLAUDE.md](CLAUDE.md) for the full project structure and architectural deci
 - [✅] Phase 2: Telemetry simulator + Kinesis consumer
 - [✅] Phase 3: Feature engineering pipeline
 - [✅] Phase 4: Isolation Forest model
-- [~] Phase 5: LSTM model + training notebook
-- [~] Phase 6: FastAPI inference endpoints
-- [~] Phase 7: LLM RCA assistant
-- [~] Phase 8: Alert manager + CloudWatch integration
-- [~] Phase 9: Next.js real-time dashboard
-- [~] Phase 10: Docker Compose full-stack wiring
-- [⏳] Phase 11: AWS deployment
-- [✅] Phase 12: Real website monitoring (google.com, github.com, cloudflare.com, amazon.com, 1.1.1.1)
+- [✅] Phase 5: LSTM model + training notebook
+- [✅] Phase 6: FastAPI inference endpoints
+- [✅] Phase 7: LLM RCA assistant
+- [✅] Phase 8: Alert manager + CloudWatch integration
+- [✅] Phase 9: Next.js real-time dashboard
+- [✅] Phase 10: Docker Compose full-stack wiring
+- [✅] Phase 11: Real website monitoring (google.com, github.com, cloudflare.com, amazon.com, 1.1.1.1)
 
 ## Results
 
